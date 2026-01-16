@@ -1,0 +1,97 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { supabase } from "../../lib/supabase";
+
+const { id } = Astro.params;
+
+let commentError = "";
+if (Astro.request.method === "POST") {
+    const accessToken = Astro.cookies.get("sb-access-token");
+    const refreshToken = Astro.cookies.get("sb-refresh-token");
+
+    if (!accessToken) return Astro.redirect("/login");
+
+    const { data: { session } } = await supabase.auth.setSession({
+        access_token: accessToken.value,
+        refresh_token: refreshToken?.value || "",
+    });
+
+    if (session) {
+        const formData = await Astro.request.formData();
+        const content = formData.get("content")?.toString();
+        if (content) {
+            const { error } = await supabase.from("comments").insert({
+                post_id: id, user_id: session.user.id, content
+            });
+            if (error) commentError = error.message;
+        }
+    }
+}
+
+const { data: post } = await supabase.from("posts").select(`*, profiles(username)`).eq("id", id).single();
+if (!post) return Astro.redirect("/404");
+
+const { data: comments } = await supabase.from("comments").select(`*, profiles(username)`).eq("post_id", id).order("created_at", { ascending: true });
+const isLoggedIn = Astro.cookies.has("sb-access-token");
+---
+
+<Layout title={post.title}>
+  <article class="max-w-3xl mx-auto bg-white px-8 py-12 md:p-12 rounded-2xl shadow-sm border border-gray-100 mb-12">
+    <div class="mb-8 text-center">
+        <span class="text-blue-600 font-semibold tracking-wide uppercase text-sm">Published {new Date(post.created_at).toLocaleDateString()}</span>
+        <h1 class="text-3xl md:text-5xl font-extrabold text-slate-900 mt-3 mb-6 leading-tight">{post.title}</h1>
+        <div class="flex items-center justify-center gap-2">
+             <div class="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs">
+                {post.profiles?.username?.[0].toUpperCase()}
+             </div>
+             <span class="text-slate-600 font-medium">By @{post.profiles?.username}</span>
+        </div>
+    </div>
+
+    <div class="prose prose-lg prose-slate prose-headings:font-bold prose-a:text-blue-600 max-w-none">
+        {post.content}
+    </div>
+  </article>
+
+  <div class="max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-8">
+        <h3 class="text-2xl font-bold text-slate-900">Discussion <span class="text-slate-400 text-lg font-normal">({comments?.length || 0})</span></h3>
+    </div>
+
+    <div class="space-y-6 mb-12">
+        {comments?.map((comment) => (
+            <div class="flex gap-4">
+                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-blue-700 font-bold">
+                     {comment.profiles?.username?.[0].toUpperCase()}
+                </div>
+                <div class="bg-white p-5 rounded-r-xl rounded-bl-xl shadow-sm border border-gray-100 flex-grow">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-slate-900">@{comment.profiles?.username}</span>
+                        <span class="text-xs text-slate-400">{new Date(comment.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <p class="text-slate-700 leading-relaxed">{comment.content}</p>
+                </div>
+            </div>
+        ))}
+    </div>
+
+    {isLoggedIn ? (
+        <form method="POST" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <label class="block font-bold text-slate-700 mb-2">Join the conversation</label>
+            <textarea name="content" rows="3" class="w-full bg-gray-50 border border-gray-200 p-4 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all" placeholder="What are your thoughts?" required></textarea>
+            <div class="flex justify-end mt-4">
+                <button class="bg-slate-900 text-white px-6 py-2.5 rounded-full font-semibold hover:bg-slate-800 transition-colors">
+                    Post Comment
+                </button>
+            </div>
+            {commentError && <p class="text-red-500 text-sm mt-2">{commentError}</p>}
+        </form>
+    ) : (
+        <div class="bg-blue-50 p-8 rounded-2xl text-center border border-blue-100">
+            <h4 class="text-blue-900 font-bold text-lg mb-2">Log in to comment</h4>
+            <p class="text-blue-700 mb-4">Join the community to share your thoughts.</p>
+            <a href="/login" class="bg-blue-600 text-white px-6 py-2 rounded-full font-semibold hover:bg-blue-700 transition-colors inline-block">Log In Now</a>
+        </div>
+    )}
+  </div>
+</Layout>

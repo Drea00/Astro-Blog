@@ -1,0 +1,81 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { supabase } from "../lib/supabase";
+
+let errorMessage = "";
+let successMessage = "";
+
+if (Astro.request.method === "POST") {
+  try {
+    const formData = await Astro.request.formData();
+    const email = formData.get("email")?.toString();
+    const password = formData.get("password")?.toString();
+    const username = formData.get("username")?.toString();
+
+    if (!email || !password || !username) {
+      errorMessage = "Please fill in all fields.";
+    } else {
+      // 1. Sign up with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: username,
+          },
+        },
+      });
+
+      if (error) {
+        errorMessage = error.message;
+      } else {
+        successMessage = "Account created! Please check your email to verify.";
+      }
+    }
+  } catch (error) {
+    console.error("SIGN UP ERROR:", error);
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else {
+      errorMessage = "An unexpected error occurred.";
+    }
+  }
+}
+--- 
+<Layout title="Register">
+  <div class="max-w-md mx-auto mt-10">
+    <h1 class="text-3xl font-bold mb-5">Sign Up</h1>
+
+    {errorMessage && (
+      <p class="bg-red-100 text-red-900 p-3 rounded mb-4">{errorMessage}</p>
+    )}
+    {successMessage && (
+      <p class="bg-green-100 text-green-900 p-3 rounded mb-4">{successMessage}</p>
+    )}
+
+    <form method="POST" enctype="multipart/form-data" class="flex flex-col gap-4">
+      <label class="flex flex-col">
+        <span class="font-semibold">Username</span>
+        <input type="text" name="username" class="border p-2 rounded" required />
+      </label>
+      
+      <label class="flex flex-col">
+        <span class="font-semibold">Email</span>
+        <input type="email" name="email" class="border p-2 rounded" required />
+      </label>
+
+      <label class="flex flex-col">
+        <span class="font-semibold">Password</span>
+        <input type="password" name="password" class="border p-2 rounded" required />
+      </label>
+
+      <button class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">
+        Create Account
+      </button>
+    </form>
+    
+    <p class="mt-4 text-sm">
+        Already have an account? <a href="/login" class="text-blue-600 underline">Log in here</a>.
+    </p>
+  </div>
+</Layout>

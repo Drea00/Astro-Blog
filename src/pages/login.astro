@@ -1,0 +1,62 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { supabase } from "../lib/supabase";
+
+// Redirect if already logged in? We can add that logic later.
+
+if (Astro.request.method === "POST") {
+  const formData = await Astro.request.formData();
+  const email = formData.get("email")?.toString();
+  const password = formData.get("password")?.toString();
+
+  if (email && password) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error("Login error:", error.message);
+      // Ideally show error on screen (omitted for brevity)
+    } else {
+      // SUCCESS: Set the access token and refresh token in cookies
+      const { access_token, refresh_token } = data.session;
+      
+      // Store these tokens in cookies so Astro can read them on subsequent requests
+      Astro.cookies.set("sb-access-token", access_token, {
+        path: "/",
+      });
+      Astro.cookies.set("sb-refresh-token", refresh_token, {
+        path: "/",
+      });
+
+      return Astro.redirect("/dashboard");
+    }
+  }
+}
+---
+
+<Layout title="Login">
+  <div class="max-w-md mx-auto mt-10">
+    <h1 class="text-3xl font-bold mb-5">Login</h1>
+    
+    <form method="POST" class="flex flex-col gap-4">
+      <label class="flex flex-col">
+        <span class="font-semibold">Email</span>
+        <input type="email" name="email" class="border p-2 rounded" required />
+      </label>
+
+      <label class="flex flex-col">
+        <span class="font-semibold">Password</span>
+        <input type="password" name="password" class="border p-2 rounded" required />
+      </label>
+
+      <button class="bg-green-600 text-white p-2 rounded hover:bg-green-700">
+        Sign In
+      </button>
+    </form>
+     <p class="mt-4 text-sm">
+        No account? <a href="/register" class="text-blue-600 underline">Sign up here</a>.
+    </p>
+  </div>
+</Layout>

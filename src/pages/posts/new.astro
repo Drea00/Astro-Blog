@@ -1,0 +1,84 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { supabase } from "../../lib/supabase";
+
+// 1. Auth Check
+const accessToken = Astro.cookies.get("sb-access-token");
+const refreshToken = Astro.cookies.get("sb-refresh-token");
+
+if (!accessToken || !refreshToken) {
+  return Astro.redirect("/login");
+}
+
+const { data: { session } } = await supabase.auth.setSession({
+  access_token: accessToken.value,
+  refresh_token: refreshToken.value,
+});
+
+let errorMessage = "";
+
+// 2. Handle Form Submission
+if (Astro.request.method === "POST") {
+  const formData = await Astro.request.formData();
+  const title = formData.get("title")?.toString();
+  const content = formData.get("content")?.toString();
+  const excerpt = formData.get("excerpt")?.toString();
+  
+  // Simple slug generator: "My First Post" -> "my-first-post"
+  const slug = title?.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+
+  if (!title || !content || !slug) {
+      errorMessage = "Title and Content are required.";
+  } else {
+      const { error } = await supabase.from("posts").insert({
+          title,
+          content,
+          excerpt,
+          slug,
+          user_id: session?.user.id
+      });
+
+      if (error) {
+          errorMessage = error.message;
+          // Handle duplicate slug error specifically if you want
+          if (error.code === '23505') errorMessage = "A post with this title already exists.";
+      } else {
+          return Astro.redirect("/dashboard");
+      }
+  }
+}
+---
+
+<Layout title="New Post">
+  <div class="max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-3xl font-bold">Write a New Post</h1>
+        <a href="/dashboard" class="text-gray-600 hover:text-gray-900">Cancel</a>
+    </div>
+
+    {errorMessage && (
+        <p class="bg-red-100 text-red-900 p-3 rounded mb-4">{errorMessage}</p>
+    )}
+
+    <form method="POST" enctype="multipart/form-data" class="flex flex-col gap-6 bg-white p-8 rounded-lg shadow-sm">
+        <label class="flex flex-col gap-2">
+            <span class="font-semibold text-gray-700">Title</span>
+            <input type="text" name="title" class="border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Enter post title..." required />
+        </label>
+
+        <label class="flex flex-col gap-2">
+            <span class="font-semibold text-gray-700">Excerpt (Short Summary)</span>
+            <textarea name="excerpt" rows="2" class="border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="A brief summary for the home page..."></textarea>
+        </label>
+
+        <label class="flex flex-col gap-2">
+            <span class="font-semibold text-gray-700">Content</span>
+            <textarea name="content" rows="10" class="border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Write your masterpiece here..." required></textarea>
+        </label>
+
+        <button class="bg-blue-600 text-white py-3 rounded hover:bg-blue-700 font-bold text-lg">
+            Publish Post
+        </button>
+    </form>
+  </div>
+</Layout>
