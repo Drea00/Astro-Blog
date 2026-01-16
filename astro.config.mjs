@@ -1,16 +1,15 @@
-// @ts-check
 import { defineConfig } from 'astro/config';
-import node from '@astrojs/node';
-import tailwind from '@astrojs/tailwind'; // 👈 Standard integration
+import tailwind from '@astrojs/tailwind';
+
+
+import netlify from '@astrojs/netlify';
 
 export default defineConfig({
   output: 'server',
-  
+
   integrations: [
-    tailwind() // 👈 Moves from "vite plugins" to "integrations"
+    tailwind()
   ],
 
-  adapter: node({
-    mode: 'standalone'
-  })
+  adapter: netlify()
 });
